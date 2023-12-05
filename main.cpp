@@ -35,17 +35,18 @@ void obtener_datos_entrega();
 void app_cliente();
 void app_admin();
 void pagar_servicio(string clave_cliente);
-void mostrar_entregas(string clave_cliente);
-bool encontrar_cliente(string nombre_cliente);
+void mostrar_entregas(string nombre_cliente);
+bool encontrar_cliente(string clave_cliente);
 bool encontrar_entrega(string nombre_entrega);
-bool cliente_activo(string nombre_cliente);
-bool inicio_admin(string contrasena);
+bool cliente_activo(string clave_cliente);
+bool inicio_admin(string usuario, string contrasena);
 bool stob(string str);
 string input(string str);
 string print_menu();
 string print_menu_cliente();
 string print_menu_admin();
 string obtener_usuario();
+string get_clave(string usuario);
 
 // crea un nuevo cliente y lo agrega al vector de clientes
 void agregar_cliente(string nombre, string clave, bool al_corriente)
@@ -146,67 +147,68 @@ void leer_archivos()
 {
     string linea;
 
-    ifstream Clientes("clientes.csv");
-    ifstream Entregas("entregas.csv");
+    // Lectura del archivo clientes.csv
+    ifstream archivo_clientes("clientes.csv");
 
-    // verifica que se hayan abierto los archivos
-    if (!Clientes.is_open())
+    if (!archivo_clientes.is_open())
     {
         cout << "No se pudo abrir el archivo de clientes." << endl;
         return;
     }
 
-    if (!Entregas.is_open())
+    while (getline(archivo_clientes, linea))
+    {
+        istringstream ss(linea);
+        string nombre, clave, al_corriente_str;
+
+        if (getline(ss, nombre, ',') && getline(ss, clave, ',') && getline(ss, al_corriente_str))
+        {
+            bool al_corriente = (al_corriente_str == "true" || al_corriente_str == "1");
+            Cliente cl;
+            cl.nombre = nombre;
+            cl.clave = clave;
+            cl.al_corriente = al_corriente;
+
+            lista_clientes.push_back(cl);
+        }
+        else
+        {
+            cout << "Formato de línea incorrecto: " << linea << endl;
+        }
+    }
+
+    archivo_clientes.close();
+
+    // Lectura del archivo entregas.csv
+    ifstream archivo_entregas("entregas.csv");
+
+    if (!archivo_entregas.is_open())
     {
         cout << "No se pudo abrir el archivo de entregas." << endl;
         return;
     }
 
-    // agrega los clientes al vector
-    while (getline(Clientes, linea))
+    while (getline(archivo_entregas, linea))
     {
         istringstream ss(linea);
-        string token;
-        vector<string> campos;
-        while (getline(ss, token, ','))
-        {
-            campos.push_back(token);
-        }
-        if (campos.size() == 3)
-        {
-            Cliente cl;
-            cl.nombre = campos[0];
-            cl.clave = campos[1];
-            cl.al_corriente = stob(campos[2]);
+        string clave_entrega, clave_cliente, direccion;
 
-            lista_clientes.push_back(cl);
-        }
-    }
-    // agrega las entregas al vector
-    while (getline(Entregas, linea))
-    {
-        istringstream ss(linea);
-        string token;
-        vector<string> campos;
-        while (getline(ss, token, ','))
-        {
-            campos.push_back(token);
-        }
-
-        if (campos.size() == 3)
+        if (getline(ss, clave_entrega, ',') && getline(ss, clave_cliente, ',') && getline(ss, direccion))
         {
             Entrega en;
-            en.clave_entrega = campos[0];
-            en.clave_cliente = campos[1];
-            en.direccion = campos[2];
+            en.clave_entrega = clave_entrega;
+            en.clave_cliente = clave_cliente;
+            en.direccion = direccion;
 
             lista_entregas.push_back(en);
         }
+        else
+        {
+            cout << "Formato de línea incorrecto en entregas.csv: " << linea << endl;
+        }
     }
 
-    // cierra los archivos
-    Clientes.close();
-    Entregas.close();
+    archivo_entregas.close();
 }
 
 // obtiene los datos del cliente y los agrega a la lista correspondiente
@@ -244,18 +246,24 @@ void app_cliente()
             {
                 usuario = obtener_usuario();
             } while (usuario == "");
-            if (cliente_activo(usuario))
-            {
-            }
             break;
 
         case 2:
             if (usuario != "")
             {
+                pagar_servicio(get_clave(usuario));
             }
+            else
+                cout << "Es necesario que se Identifique primero" << endl;
             break;
 
         case 3:
+            if (usuario != "")
+            {
+                mostrar_entregas(get_clave(usuario));
+            }
+            else
+                cout << "Es necesario que se Identifique primero" << endl;
             break;
 
         case 4:
@@ -308,11 +316,98 @@ void app_admin()
         } while (running);
     }
     else
-        cout << "usuario o contrasena incorrectos";
+        cout << "usuario o contraseña incorrectos";
 }
 
-void pagar_servicio(string nombre_cliente) {}
-void mostrar_entregas(string nombre_cliente) {}
+void pagar_servicio(string clave_cliente)
+{
+    ifstream archivo_lectura("clientes.csv");
+    ofstream archivo_temporal("temp.csv");
+
+    if (!archivo_lectura.is_open() || !archivo_temporal.is_open())
+    {
+        cout << "Error al abrir archivos." << endl;
+        return;
+    }
+
+    string linea;
+    bool cliente_actualizado = false;
+
+    while (getline(archivo_lectura, linea))
+    {
+        istringstream ss(linea);
+        string token;
+        vector<string> campos;
+        while (getline(ss, token, ','))
+        {
+            campos.push_back(token);
+        }
+
+        if (campos.size() == 3 && campos[1] == clave_cliente)
+        {
+            campos[2] = "1"; // Actualiza el estado de pago a "true"
+            cliente_actualizado = true;
+        }
+
+        archivo_temporal << campos[0] << "," << campos[1] << "," << campos[2] << endl;
+    }
+
+    archivo_lectura.close();
+    archivo_temporal.close();
+
+    remove("clientes.csv");
+    rename("temp.csv", "clientes.csv");
+
+    // Actualizar la lista en memoria también si se encontró el cliente y se actualizó
+    if (cliente_actualizado)
+    {
+        for (Cliente &cl : lista_clientes)
+        {
+            if (cl.clave == clave_cliente)
+            {
+                cl.al_corriente = true;                                            // Actualiza el estado de pago en la lista en memoria
+                cout << "Cliente encontrado y actualizado: " << cl.nombre << endl; // Mensaje de depuración
+                break;                                                             // Terminar después de encontrar al cliente
+            }
+        }
+    }
+    else
+    {
+        cout << "No se encontró al cliente para actualizar" << endl; // Mensaje de depuración
+    }
+
+    if (cliente_actualizado)
+    {
+        cout << "Pago al corriente" << endl;
+    }
+    else
+    {
+        cout << "No se pudo realizar el pago" << endl;
+    }
+}
+
+void mostrar_entregas(string clave_cliente)
+{
+    bool entregas_encontradas = false;
+
+    cout << "Entregas para el cliente: " << clave_cliente << endl;
+
+    for (const Entrega &en : lista_entregas)
+    {
+        if (en.clave_cliente == clave_cliente)
+        {
+            entregas_encontradas = true;
+            cout << "Clave de la entrega: " << en.clave_entrega << endl;
+            cout << "Dirección de la entrega: " << en.direccion << endl;
+            cout << "__________________________" << endl;
+        }
+    }
+
+    if (!entregas_encontradas)
+    {
+        cout << "No se encontraron entregas para el cliente" << endl;
+    }
+}
 
 // encuentra al cliente dentro de la lista de clientes
 bool encontrar_cliente(string clave_cliente)
@@ -345,11 +440,14 @@ bool inicio_admin(string usuario, string contrasena)
 }
 
 // encuentra el cliente y verifica que este al corriente
-bool cliente_activo(string nombre_cliente){
-    for (Cliente cl : lista_clientes)
+bool cliente_activo(string clave_cliente)
+{
+    for (const Cliente &cl : lista_clientes)
     {
-        if (cl.nombre == nombre_cliente)
+        if (cl.clave == clave_cliente)
+        {
             return cl.al_corriente;
+        }
     }
     return false;
 }
@@ -405,44 +503,54 @@ string print_menu_admin()
 string obtener_usuario()
 {
     string nombre = input("Ingresa tu nombre: ");
-    for (Cliente cl : lista_clientes)
+
+    for (const Cliente &cl : lista_clientes)
     {
         if (cl.nombre == nombre)
         {
-            return nombre;
+            cout << "Cliente encontrado: " << cl.nombre << endl;
+            return cl.clave;
         }
     }
-    cout << "cliente no encontrado o inexistente" << endl;
+
+    cout << "Cliente no encontrado o inexistente" << endl;
+    return "";
+}
+
+string get_clave(string usuario)
+{
+    for (Cliente cl : lista_clientes)
+    {
+        if (cl.nombre == usuario)
+        {
+            return cl.clave;
+        }
+    }
     return "";
 }
 
 int main()
 {
     leer_archivos();
-    bool running = true;
-    do
+
+    int op = stoi(print_menu());
+
+    switch (op)
     {
-        int op = stoi(print_menu());
+    case 1:
+        app_cliente();
+        break;
 
-        switch (op)
-        {
-        case 1:
-            app_admin();
-            break;
+    case 2:
+        app_admin();
+        break;
 
-        case 2:
-            obtener_datos_entrega();
-            break;
+    case 3:
+        break;
 
-        case 3:
-            running = false;
-            break;
-
-        default:
-            cout << "ERROR, opción invalida" << endl;
-            running = false;
-            break;
-        }
-    } while (running);
+    default:
+        cout << "ERROR, opción invalida" << endl;
+        break;
+    }
     return 0;
 }
