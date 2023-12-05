@@ -2,7 +2,7 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
-//#include <algorithm>
+// #include <algorithm>
 
 using namespace std;
 
@@ -32,14 +32,20 @@ void auditar();
 void leer_archivos();
 void obtener_datos_cliente();
 void obtener_datos_entrega();
-bool encontrar_cliente(string clave_cliente);
-bool encontrar_entrega(string clave_entrega);
-bool cliente_activo(string clave_cliente);
+void app_cliente();
+void app_admin();
+void pagar_servicio(string clave_cliente);
+void mostrar_entregas(string clave_cliente);
+bool encontrar_cliente(string nombre_cliente);
+bool encontrar_entrega(string nombre_entrega);
+bool cliente_activo(string nombre_cliente);
+bool inicio_admin(string contrasena);
 bool stob(string str);
 string input(string str);
 string print_menu();
 string print_menu_cliente();
 string print_menu_admin();
+string obtener_usuario();
 
 // crea un nuevo cliente y lo agrega al vector de clientes
 void agregar_cliente(string nombre, string clave, bool al_corriente)
@@ -75,13 +81,15 @@ void agregar_cliente(string nombre, string clave, bool al_corriente)
 void agregar_entrega(string clave_entrega, string clave_cliente, string direccion)
 {
     // Verificar si la entrega ya existe en el archivo entregas.csv
-    if (encontrar_entrega(clave_entrega)) {
+    if (encontrar_entrega(clave_entrega))
+    {
         cout << "La entrega ya existe." << endl;
         return;
     }
 
     // Verificar si el cliente existe
-    if (!encontrar_cliente(clave_cliente)) {
+    if (!encontrar_cliente(clave_cliente))
+    {
         cout << "Cliente no encontrado" << endl;
         return;
     }
@@ -89,7 +97,8 @@ void agregar_entrega(string clave_entrega, string clave_cliente, string direccio
     // Agregar la entrega al archivo entregas.csv
     ofstream archivo("entregas.csv", std::ios::app);
 
-    if (!archivo.is_open()) {
+    if (!archivo.is_open())
+    {
         cout << "No se pudo abrir el archivo." << endl;
         return;
     }
@@ -114,7 +123,7 @@ void auditar()
     {
         cout << "Clave de la entrega: " << en.clave_entrega << endl;
         cout << "Clave del cliente: " << en.clave_cliente << endl;
-        cout << "Direccion de la entrega: " << en.direccion << endl;
+        cout << "Dirección de la entrega: " << en.direccion << endl;
         cout << "_________________________________________" << endl;
     }
 
@@ -218,6 +227,93 @@ void obtener_datos_entrega()
     agregar_entrega(clave_entrega, clave_cliente, direccion);
 }
 
+// interface gráfica del lado del cliente
+void app_cliente()
+{
+    string usuario;
+    bool running = true;
+
+    do
+    {
+        int op = stoi(print_menu_cliente());
+
+        switch (op)
+        {
+        case 1:
+            do
+            {
+                usuario = obtener_usuario();
+            } while (usuario == "");
+            if (cliente_activo(usuario))
+            {
+            }
+            break;
+
+        case 2:
+            if (usuario != "")
+            {
+            }
+            break;
+
+        case 3:
+            break;
+
+        case 4:
+            running = false;
+            break;
+
+        default:
+            cout << "ERROR, opción invalida" << endl;
+            running = false;
+            break;
+        }
+    } while (running);
+}
+
+// interface gráfica del lado del administrador
+void app_admin()
+{
+    string usuario = input("ingresa tu usuario");
+    string contrasena = input("ingresa tu contraseña");
+    if (inicio_admin(usuario, contrasena))
+    {
+        bool running = true;
+        do
+        {
+            int op = stoi(print_menu_admin());
+
+            switch (op)
+            {
+            case 1:
+                obtener_datos_cliente();
+                break;
+
+            case 2:
+                obtener_datos_entrega();
+                break;
+
+            case 3:
+                auditar();
+                break;
+
+            case 4:
+                running = false;
+                break;
+
+            default:
+                cout << "ERROR, opción invalida" << endl;
+                running = false;
+                break;
+            }
+        } while (running);
+    }
+    else
+        cout << "usuario o contrasena incorrectos";
+}
+
+void pagar_servicio(string nombre_cliente) {}
+void mostrar_entregas(string nombre_cliente) {}
+
 // encuentra al cliente dentro de la lista de clientes
 bool encontrar_cliente(string clave_cliente)
 {
@@ -240,6 +336,25 @@ bool encontrar_entrega(string clave_entrega)
     return false;
 }
 
+// verifica que el usuario y contraseña del admin sean correctos
+bool inicio_admin(string usuario, string contrasena)
+{
+    if (contrasena == "123" && usuario == "admin")
+        return true;
+    return false;
+}
+
+// encuentra el cliente y verifica que este al corriente
+bool cliente_activo(string nombre_cliente){
+    for (Cliente cl : lista_clientes)
+    {
+        if (cl.nombre == nombre_cliente)
+            return cl.al_corriente;
+    }
+    return false;
+}
+
+// convierte de string a booleano
 bool stob(string str)
 {
     return (str == "true" || str == "1" || str == "si");
@@ -257,12 +372,48 @@ string input(string str)
 // imprime el menu y obtiene la opción seleccionada por el usuario
 string print_menu()
 {
+    cout << "\t1)\tIngresar como cliente" << endl;
+    cout << "\t2)\tIngresar como administrador" << endl;
+    cout << "\t3)\tSalir" << endl;
+
+    return input("Escoge una opción: ");
+}
+
+// imprime el menu para el cliente
+string print_menu_cliente()
+{
+    cout << "\t1)\tIdentificarse" << endl;
+    cout << "\t2)\tPagar servicio" << endl;
+    cout << "\t3)\tRevisar entregas a tu nombre" << endl;
+    cout << "\t4)\tSalir" << endl;
+
+    return input("Escoge una opción: ");
+}
+
+// imprime el menu para el administrador
+string print_menu_admin()
+{
     cout << "\t1)\tRegistro de Cliente" << endl;
     cout << "\t2)\tRegistro de Entrega" << endl;
     cout << "\t3)\tAuditar" << endl;
     cout << "\t4)\tSalir" << endl;
 
     return input("Escoge una opción: ");
+}
+
+// obtiene y verifica al usuario
+string obtener_usuario()
+{
+    string nombre = input("Ingresa tu nombre: ");
+    for (Cliente cl : lista_clientes)
+    {
+        if (cl.nombre == nombre)
+        {
+            return nombre;
+        }
+    }
+    cout << "cliente no encontrado o inexistente" << endl;
+    return "";
 }
 
 int main()
@@ -276,7 +427,7 @@ int main()
         switch (op)
         {
         case 1:
-            obtener_datos_cliente();
+            app_admin();
             break;
 
         case 2:
@@ -284,15 +435,11 @@ int main()
             break;
 
         case 3:
-            auditar();
-            break;
-
-        case 4:
             running = false;
             break;
 
         default:
-            cout << "ERROR" << endl;
+            cout << "ERROR, opción invalida" << endl;
             running = false;
             break;
         }
